@@ -2627,6 +2627,11 @@ class PdfReaderViewModel @Inject constructor(
         }
         if (!viewState.showCreationToolbar) {
             pdfFragment.exitCurrentlyActiveMode()
+
+            // Onyx integration: If toolbar is being closed and pen is active, switch to INK mode
+            if (isOnyxDevice) {
+                onToolbarClosedWithPenCheck()
+            }
         }
     }
     override fun toggle(tool: AnnotationTool) {
@@ -3678,22 +3683,29 @@ class PdfReaderViewModel @Inject constructor(
     private fun onOnyxPenDetected() {
         Timber.d("Pen detected - switching to INK tool")
 
-        // Store current tool if it's not already INK
         val currentTool = pdfFragment.activeAnnotationTool
         Timber.d("Current tool: $currentTool")
-        
+
+        // Store current tool if it's not already INK
         if (currentTool != null && currentTool != AnnotationTool.INK) {
             previousToolBeforePen = currentTool
             Timber.d("Stored previous tool: $currentTool")
         }
 
-        // Only switch if not already in INK mode to allow continuous drawing
+        // Only skip if already in INK mode - allows continuous drawing
         if (currentTool == AnnotationTool.INK) {
             Timber.d("Already in INK mode, allowing continuous drawing")
             return
         }
 
         // Switch to INK tool
+        switchToInkMode()
+    }
+
+    /**
+     * Switch to INK annotation mode with proper configuration
+     */
+    private fun switchToInkMode() {
         try {
             // Get or use default color for INK tool
             val inkColorHex = this.toolColors[AnnotationTool.INK] ?: AnnotationsConfig.defaultActiveColor
@@ -3706,10 +3718,15 @@ class PdfReaderViewModel @Inject constructor(
 
             val lineWidth = if (this.activeLineWidth > 0) this.activeLineWidth else 2f
 
-            Timber.d("Switching to INK tool with color: $inkColorHex (${drawColor}), lineWidth: $lineWidth")
+            Timber.d("switchToInkMode: Starting switch with color: $inkColorHex (${drawColor}), lineWidth: $lineWidth")
 
             // Exit current mode first (this will exit text selection mode and any other active mode)
+            val beforeTool = pdfFragment.activeAnnotationTool
+            Timber.d("switchToInkMode: Before exit - current tool: $beforeTool")
             pdfFragment.exitCurrentlyActiveMode()
+
+            val afterExit = pdfFragment.activeAnnotationTool
+            Timber.d("switchToInkMode: After exit - current tool: $afterExit")
 
             // Configure INK tool with proper settings
             pdfFragment.annotationConfiguration.put(
@@ -3719,15 +3736,23 @@ class PdfReaderViewModel @Inject constructor(
                     .setDefaultThickness(lineWidth)
                     .build()
             )
+            Timber.d("switchToInkMode: INK tool configured")
 
             // Enter INK annotation mode - this prevents text selection automatically
             pdfFragment.enterAnnotationCreationMode(AnnotationTool.INK)
 
+            val afterEnter = pdfFragment.activeAnnotationTool
+            Timber.d("switchToInkMode: After enter - current tool: $afterEnter")
+
             triggerEffect(PdfReaderViewEffect.ScreenRefresh)
             
-            Timber.d("Successfully switched to INK tool")
+            if (afterEnter == AnnotationTool.INK) {
+                Timber.d("switchToInkMode: SUCCESS - INK tool is now active")
+            } else {
+                Timber.e("switchToInkMode: FAILED - INK tool not active after enterAnnotationCreationMode")
+            }
         } catch (e: Exception) {
-            Timber.e(e, "Error switching to INK tool")
+            Timber.e(e, "switchToInkMode: Error switching to INK tool")
         }
     }
 
@@ -3742,6 +3767,20 @@ class PdfReaderViewModel @Inject constructor(
         previousToolBeforePen = null
 
         Timber.d("Successfully exited drawing mode")
+    }
+
+    /**
+     * Called when annotation toolbar is closed - check if pen is active and switch to INK mode
+     */
+    private fun onToolbarClosedWithPenCheck() {
+        val isPenActive = onyxPenDetector?.isPenActive() ?: false
+        Timber.d("Annotation toolbar closed - pen active: $isPenActive")
+
+        if (isPenActive) {
+            Timber.d("Pen is active on toolbar close - switching to INK mode")
+            // Trigger pen detection to switch to INK mode
+            onOnyxPenDetected()
+        }
     }
 
     /**

@@ -14,6 +14,11 @@ class OnyxPenDetector(
     private var lastInputWasPen = false
 
     /**
+     * Check if the last input was from a pen
+     */
+    fun isPenActive(): Boolean = lastInputWasPen
+
+    /**
      * Process a motion event to detect pen vs finger input.
      * Returns false to allow the event to continue processing.
      */
