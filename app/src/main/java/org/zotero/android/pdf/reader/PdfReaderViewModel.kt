@@ -3680,18 +3680,47 @@ class PdfReaderViewModel @Inject constructor(
 
         // Store current tool if it's not already INK
         val currentTool = pdfFragment.activeAnnotationTool
+        Timber.d("Current tool: $currentTool")
+        
         if (currentTool != null && currentTool != AnnotationTool.INK) {
             previousToolBeforePen = currentTool
             Timber.d("Stored previous tool: $currentTool")
         }
 
-        // Switch to INK tool using the same method as selectTool()
-        if (currentTool != AnnotationTool.INK) {
-            val drawColor = this.toolColors[AnnotationTool.INK]?.let { parseColor(it) }
+        // Switch to INK tool even if already active to ensure proper state
+        try {
+            // Get or use default color for INK tool
+            val inkColorHex = this.toolColors[AnnotationTool.INK] ?: AnnotationsConfig.defaultActiveColor
+            val drawColor = try {
+                parseColor(inkColorHex)
+            } catch (e: Exception) {
+                Timber.w(e, "Failed to parse color $inkColorHex, using black")
+                android.graphics.Color.BLACK
+            }
+
+            val lineWidth = if (this.activeLineWidth > 0) this.activeLineWidth else 2f
+
+            Timber.d("Switching to INK tool with color: $inkColorHex (${drawColor}), lineWidth: $lineWidth")
+
+            // Exit current mode first
             pdfFragment.exitCurrentlyActiveMode()
-            configureInk(drawColor, this.activeLineWidth)
+
+            // Configure INK tool with proper settings
+            pdfFragment.annotationConfiguration.put(
+                AnnotationTool.INK,
+                InkAnnotationConfiguration.builder(context)
+                    .setDefaultColor(drawColor)
+                    .setDefaultThickness(lineWidth)
+                    .build()
+            )
+
+            // Enter INK annotation mode
             pdfFragment.enterAnnotationCreationMode(AnnotationTool.INK)
             triggerEffect(PdfReaderViewEffect.ScreenRefresh)
+            
+            Timber.d("Successfully switched to INK tool")
+        } catch (e: Exception) {
+            Timber.e(e, "Error switching to INK tool")
         }
     }
 
@@ -3708,6 +3737,10 @@ class PdfReaderViewModel @Inject constructor(
             // Exit annotation creation mode instead of switching back
             pdfFragment.exitCurrentlyActiveMode()
             previousToolBeforePen = null
+            Timber.d("Successfully exited drawing mode")
+        } else {
+            Timber.d("No previous tool to restore, just exiting drawing mode")
+            pdfFragment.exitCurrentlyActiveMode()
         }
     }
 
