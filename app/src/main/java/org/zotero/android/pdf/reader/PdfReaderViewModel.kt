@@ -15,6 +15,7 @@ import androidx.lifecycle.DefaultLifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.viewModelScope
+import com.onyx.android.sdk.utils.ColorUtils.parseColor
 import com.pspdfkit.R
 import com.pspdfkit.annotations.Annotation
 import com.pspdfkit.annotations.AnnotationFlags
@@ -99,6 +100,8 @@ import org.zotero.android.database.DbRequest
 import org.zotero.android.database.DbWrapperMain
 import org.zotero.android.database.objects.AnnotationsConfig
 import org.zotero.android.database.objects.FieldKeys
+import org.zotero.android.pdf.reader.onyx.OnyxDeviceDetector
+import org.zotero.android.pdf.reader.onyx.OnyxPenDetector
 import org.zotero.android.database.objects.RItem
 import org.zotero.android.database.objects.UpdatableChangeType
 import org.zotero.android.database.objects.zoteroType
@@ -258,6 +261,11 @@ class PdfReaderViewModel @Inject constructor(
     private var shouldPreserveFilterResultsBetweenReinitializations = false
 
     private var initialPage: Int? = null
+
+    // Onyx SDK integration
+    private var onyxPenDetector: OnyxPenDetector? = null
+    private var previousToolBeforePen: AnnotationTool? = null
+    private val isOnyxDevice: Boolean by lazy { OnyxDeviceDetector.isOnyxDevice() }
 
     @Inject
     lateinit var citationControllerProvider: Provider<CitationController>
@@ -460,6 +468,7 @@ class PdfReaderViewModel @Inject constructor(
                 addOnAnnotationCreationModeChangeListener()
                 setOnPreparePopupToolbarListener()
                 addDocumentScrollListener()
+                setupOnyxPenDetection()
             }
 
             override fun onDestroy(owner: LifecycleOwner) {
@@ -3642,6 +3651,72 @@ class PdfReaderViewModel @Inject constructor(
                 showSingleCitationScreen = false
             )
         }
+    }
+
+    // Onyx SDK Integration Methods
+
+    /**
+     * Setup pen detection for Onyx e-ink devices.
+     * Automatically switches to INK tool when stylus is detected.
+     */
+    private fun setupOnyxPenDetection() {
+        if (!isOnyxDevice) {
+            Timber.d("Not an Onyx device - pen detection disabled")
+            return
+        }
+
+        Timber.d("Onyx device detected - enabling pen detection")
+        onyxPenDetector = OnyxPenDetector(
+            onPenDetected = { onOnyxPenDetected() },
+            onFingerDetected = { onOnyxFingerDetected() }
+        )
+    }
+
+    /**
+     * Called when stylus is detected - switch to INK annotation tool
+     */
+    private fun onOnyxPenDetected() {
+        Timber.d("Pen detected - switching to INK tool")
+
+        // Store current tool if it's not already INK
+        val currentTool = pdfFragment.activeAnnotationTool
+        if (currentTool != null && currentTool != AnnotationTool.INK) {
+            previousToolBeforePen = currentTool
+            Timber.d("Stored previous tool: $currentTool")
+        }
+
+        // Switch to INK tool using the same method as selectTool()
+        if (currentTool != AnnotationTool.INK) {
+            val drawColor = this.toolColors[AnnotationTool.INK]?.let { parseColor(it) }
+            pdfFragment.exitCurrentlyActiveMode()
+            configureInk(drawColor, this.activeLineWidth)
+            pdfFragment.enterAnnotationCreationMode(AnnotationTool.INK)
+            triggerEffect(PdfReaderViewEffect.ScreenRefresh)
+        }
+    }
+
+    /**
+     * Called when finger is detected - restore previous annotation tool
+     */
+    private fun onOnyxFingerDetected() {
+        Timber.d("Finger detected - restoring previous tool")
+
+        // Only restore if we have a previous tool stored
+        val previousTool = previousToolBeforePen
+        if (previousTool != null) {
+            Timber.d("Restoring previous tool: $previousTool")
+            // Exit annotation creation mode instead of switching back
+            pdfFragment.exitCurrentlyActiveMode()
+            previousToolBeforePen = null
+        }
+    }
+
+    /**
+     * Handle motion events for Onyx pen detection.
+     * Call this from the UI layer when touch events occur.
+     */
+    fun handleMotionEvent(event: MotionEvent) {
+        onyxPenDetector?.handleMotionEvent(event)
     }
 }
 

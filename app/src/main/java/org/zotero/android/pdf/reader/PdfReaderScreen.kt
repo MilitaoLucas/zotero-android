@@ -176,7 +176,10 @@ internal fun PdfReaderScreen(
         CustomScaffoldM3(
             modifier = Modifier.pointerInteropFilter {
                 when (it.action) {
-                    MotionEvent.ACTION_DOWN -> viewModel.restartDisableForceScreenOnTimer()
+                    MotionEvent.ACTION_DOWN -> {
+                        viewModel.restartDisableForceScreenOnTimer()
+                        viewModel.handleMotionEvent(it)
+                    }
                 }
                 false
             },

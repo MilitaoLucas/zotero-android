@@ -176,6 +176,30 @@ dependencies {
     implementation(Libs.keyboardVisibility)
     implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
 
+    //Onyx SDK for e-ink device support
+    implementation("com.onyx.android.sdk:onyxsdk-device:1.3.1.3") {
+        exclude(group = "com.android.support", module = "support-compat")
+        exclude(group = "com.android.support", module = "support-v4")
+        exclude(group = "com.tencent", module = "mmkv")
+    }
+    // newest: 1.5.0.4, can't update, as onyxsdk-geometry is not available.
+    implementation("com.onyx.android.sdk:onyxsdk-pen:1.4.12.1") {
+        exclude(group = "com.android.support", module = "support-compat")
+        exclude(group = "com.android.support", module = "appcompat-v7")
+        exclude(group = "com.android.support", module = "support-v4")
+        exclude(group = "com.android.support", module = "support-annotations")
+        exclude(group = "com.android.support", module = "support-v13")
+        exclude(group = "com.tencent", module = "mmkv")
+    }
+    implementation("com.onyx.android.sdk:onyxsdk-base:1.8.2.1") {
+        exclude(group = "com.android.support", module = "support-compat")
+        exclude(group = "com.android.support", module = "appcompat-v7")
+        exclude(group = "com.android.support", module = "support-v4")
+        exclude(group = "com.android.support", module = "support-annotations")
+        exclude(group = "com.android.support", module = "support-v13")
+        exclude(group = "com.tencent", module = "mmkv")
+    }
+
 }
 
 kapt {
