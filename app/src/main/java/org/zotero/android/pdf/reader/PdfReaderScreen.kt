@@ -175,10 +175,13 @@ internal fun PdfReaderScreen(
 
         CustomScaffoldM3(
             modifier = Modifier.pointerInteropFilter {
+                // Handle pen detection for all motion events
+                viewModel.handleMotionEvent(it)
+
+                // Also handle screen timeout on ACTION_DOWN
                 when (it.action) {
                     MotionEvent.ACTION_DOWN -> {
                         viewModel.restartDisableForceScreenOnTimer()
-                        viewModel.handleMotionEvent(it)
                     }
                 }
                 false

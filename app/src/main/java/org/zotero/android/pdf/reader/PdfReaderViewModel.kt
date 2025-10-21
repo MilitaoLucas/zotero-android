@@ -3687,7 +3687,13 @@ class PdfReaderViewModel @Inject constructor(
             Timber.d("Stored previous tool: $currentTool")
         }
 
-        // Switch to INK tool even if already active to ensure proper state
+        // Only switch if not already in INK mode to allow continuous drawing
+        if (currentTool == AnnotationTool.INK) {
+            Timber.d("Already in INK mode, allowing continuous drawing")
+            return
+        }
+
+        // Switch to INK tool
         try {
             // Get or use default color for INK tool
             val inkColorHex = this.toolColors[AnnotationTool.INK] ?: AnnotationsConfig.defaultActiveColor
@@ -3702,7 +3708,7 @@ class PdfReaderViewModel @Inject constructor(
 
             Timber.d("Switching to INK tool with color: $inkColorHex (${drawColor}), lineWidth: $lineWidth")
 
-            // Exit current mode first
+            // Exit current mode first (this will exit text selection mode and any other active mode)
             pdfFragment.exitCurrentlyActiveMode()
 
             // Configure INK tool with proper settings
@@ -3714,8 +3720,9 @@ class PdfReaderViewModel @Inject constructor(
                     .build()
             )
 
-            // Enter INK annotation mode
+            // Enter INK annotation mode - this prevents text selection automatically
             pdfFragment.enterAnnotationCreationMode(AnnotationTool.INK)
+
             triggerEffect(PdfReaderViewEffect.ScreenRefresh)
             
             Timber.d("Successfully switched to INK tool")
@@ -3730,18 +3737,11 @@ class PdfReaderViewModel @Inject constructor(
     private fun onOnyxFingerDetected() {
         Timber.d("Finger detected - restoring previous tool")
 
-        // Only restore if we have a previous tool stored
-        val previousTool = previousToolBeforePen
-        if (previousTool != null) {
-            Timber.d("Restoring previous tool: $previousTool")
-            // Exit annotation creation mode instead of switching back
-            pdfFragment.exitCurrentlyActiveMode()
-            previousToolBeforePen = null
-            Timber.d("Successfully exited drawing mode")
-        } else {
-            Timber.d("No previous tool to restore, just exiting drawing mode")
-            pdfFragment.exitCurrentlyActiveMode()
-        }
+        // Exit annotation creation mode to return to normal navigation
+        pdfFragment.exitCurrentlyActiveMode()
+        previousToolBeforePen = null
+
+        Timber.d("Successfully exited drawing mode")
     }
 
     /**

@@ -18,14 +18,10 @@ class OnyxPenDetector(
      * Returns false to allow the event to continue processing.
      */
     fun handleMotionEvent(event: MotionEvent): Boolean {
-        // Only process ACTION_DOWN to avoid multiple triggers
-        if (event.action != MotionEvent.ACTION_DOWN) {
-            return false
-        }
-
         // Check if input is from stylus
         val isPen = event.getToolType(0) == MotionEvent.TOOL_TYPE_STYLUS
 
+        // Only trigger callbacks when input type CHANGES
         if (isPen && !lastInputWasPen) {
             Timber.d("OnyxPenDetector: Pen detected - switching to drawing mode")
             lastInputWasPen = true
@@ -35,6 +31,7 @@ class OnyxPenDetector(
             lastInputWasPen = false
             onFingerDetected()
         }
+        // If input type hasn't changed, do nothing - allows continuous drawing
 
         return false // Allow event to continue
     }
